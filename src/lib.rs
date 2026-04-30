@@ -304,18 +304,20 @@ where
     pub fn run(
         &mut self,
     ) -> Result<(), Error<BusError<SPIError, CSError>>> {
+        let point = self.read_touch_point()?;
+        let is_low = self.irq.is_low()?;
         match self.screen_state {
             TouchScreenState::IDLE => {
-                if /*self.operation_mode == TouchScreenOperationMode::CALIBRATION &&*/ self.irq.is_low()?
+                if /*self.operation_mode == TouchScreenOperationMode::CALIBRATION &&*/ is_low
                 {
                     self.screen_state = TouchScreenState::PRESAMPLING;
                 }
             }
             TouchScreenState::PRESAMPLING => {
-                if self.irq.is_high()? {
+                if !is_low {
                     self.screen_state = TouchScreenState::RELEASED
                 }
-                let point_sample = self.read_touch_point()?;
+                let point_sample = point;
                 self.ts.samples[self.ts.counter] = point_sample;
                 self.ts.counter += 1;
                 if self.ts.counter + 1 == MAX_SAMPLES {
@@ -324,7 +326,7 @@ where
                 }
             }
             TouchScreenState::TOUCHED => {
-                let point_sample = self.read_touch_point()?;
+                let point_sample = point;
                 self.ts.samples[self.ts.counter] = point_sample;
                 self.ts.counter += 1;
                 /*
@@ -332,7 +334,7 @@ where
                  * is touched for longer time
                  */
                 self.ts.counter.rem_assign(MAX_SAMPLES - 1);
-                if self.irq.is_high()? {
+                if !is_low {
                     self.screen_state = TouchScreenState::RELEASED
                 }
             }
