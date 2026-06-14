@@ -1,8 +1,9 @@
-# XPT2046 touch LCD driver
+# Async XPT2046 touch LCD driver
 
-example usage: https://github.com/lampaBiurkowa/esp32-ili9341-slint
+example usage: https://github.com/sukhmel/esp32c3-playground
 
-fork of https://github.com/N8BWert/xpt2046
+fork of https://github.com/lampaBiurkowa/xpt2046
+which is fork of https://github.com/N8BWert/xpt2046
 which itself is fork of https://github.com/VersBinarii/xpt2046
 which is licensed on:
 

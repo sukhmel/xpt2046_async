@@ -25,7 +25,8 @@ pub use crate::{
 };
 use core::{fmt::Debug, ops::RemAssign};
 use embedded_graphics_core::geometry::Point;
-use embedded_hal::{delay::DelayNs, digital::InputPin, spi::SpiDevice};
+use embedded_hal_async::spi::SpiDevice;
+use embedded_hal::{delay::DelayNs, digital::InputPin};
 
 
 pub mod calibration;
@@ -217,16 +218,17 @@ where
     SPIError: Debug,
     CSError: Debug,
 {
-    fn spi_read(&mut self) -> Result<(), Error<BusError<SPIError, CSError>>> {
+    async fn spi_read(&mut self) -> Result<(), Error<BusError<SPIError, CSError>>> {
         self.spi
             .transfer(&mut self.rx_buff, &self.tx_buff)
+            .await
             .map_err(|e| Error::Bus(BusError::Spi(e)))?;
         Ok(())
     }
 
     /// Read raw values from the XPT2046 driver
-    fn read_xy(&mut self) -> Result<Point, Error<BusError<SPIError, CSError>>> {
-        self.spi_read()?;
+    async fn read_xy(&mut self) -> Result<Point, Error<BusError<SPIError, CSError>>> {
+        self.spi_read().await?;
 
         let x = ((self.rx_buff[1] as i32) << 8) | (self.rx_buff[2] as i32);
         let y = ((self.rx_buff[3] as i32) << 8) | (self.rx_buff[4] as i32);
@@ -234,8 +236,8 @@ where
     }
 
     /// Read the calibrated point of touch from XPT2046
-    fn read_touch_point(&mut self) -> Result<Point, Error<BusError<SPIError, CSError>>> {
-        let raw_point = self.read_xy()?;
+    async fn read_touch_point(&mut self) -> Result<Point, Error<BusError<SPIError, CSError>>> {
+        let raw_point = self.read_xy().await?;
 
         let (x, y) = match self.operation_mode {
             TouchScreenOperationMode::NORMAL => {
@@ -274,12 +276,12 @@ where
     }
 
     /// Reset the driver and preload tx buffer with register data.
-    pub fn init<D: DelayNs>(
+    pub async fn init<D: DelayNs>(
         &mut self,
         delay: &mut D,
     ) -> Result<(), Error<BusError<SPIError, CSError>>> {
         self.tx_buff[0] = 0x80;
-        self.spi_read()?;
+        self.spi_read().await?;
         delay.delay_ms(1);
 
         /*
@@ -301,10 +303,10 @@ where
     /// Continually runs and and collects the touch data from xpt2046.
     /// You should drive this either in some main loop or dedicated timer
     /// interrupt
-    pub fn run(
+    pub async fn run(
         &mut self,
     ) -> Result<(), Error<BusError<SPIError, CSError>>> {
-        let point = self.read_touch_point()?;
+        let point = self.read_touch_point().await?;
         let is_low = self.irq.is_low()?;
         match self.screen_state {
             TouchScreenState::IDLE => {

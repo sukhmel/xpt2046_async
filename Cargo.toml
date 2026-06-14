@@ -1,5 +1,5 @@
 [package]
-name = "xpt2046"
+name = "xpt2046-async"
 version = "0.3.1"
 edition = "2021"
 description = "Embedded-hal based XPT2046 driver for TFT LCD displays"
@@ -10,9 +10,9 @@ repository = "https://github.com/VersBinarii/xpt2046"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-name = "xpt2046"
+name = "xpt2046_async"
 
 [dependencies]
+embedded-hal-async = "=1.0.0"
 embedded-hal = "=1.0.0"
-embedded-graphics = "0.8.1"
 embedded-graphics-core = "0.4.0"
