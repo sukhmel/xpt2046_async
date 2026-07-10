@@ -26,6 +26,7 @@ pub use crate::{
 use core::{fmt::Debug, ops::RemAssign};
 use embedded_graphics_core::geometry::Point;
 use embedded_hal_async::spi::SpiDevice;
+use embedded_hal_async::digital::Wait;
 use embedded_hal::{delay::DelayNs, digital::InputPin};
 
 
@@ -214,7 +215,9 @@ where
 impl<SPI, PinIRQ, SPIError, CSError> Xpt2046<SPI, PinIRQ>
 where
     SPI: SpiDevice<u8, Error = SPIError>,
-    PinIRQ: InputPin<Error = CSError>,
+    // `InputPin` is used to sample the level while a touch is in progress;
+    // `Wait` lets us sleep (instead of polling) until a touch begins.
+    PinIRQ: InputPin<Error = CSError> + Wait,
     SPIError: Debug,
     CSError: Debug,
 {
@@ -306,15 +309,17 @@ where
     pub async fn run(
         &mut self,
     ) -> Result<(), Error<BusError<SPIError, CSError>>> {
+        if self.screen_state == TouchScreenState::IDLE {
+            self.irq.wait_for_low().await?;
+            self.screen_state = TouchScreenState::PRESAMPLING;
+            return Ok(());
+        }
+
         let point = self.read_touch_point().await?;
         let is_low = self.irq.is_low()?;
         match self.screen_state {
-            TouchScreenState::IDLE => {
-                if /*self.operation_mode == TouchScreenOperationMode::CALIBRATION &&*/ is_low
-                {
-                    self.screen_state = TouchScreenState::PRESAMPLING;
-                }
-            }
+            // Handled above by awaiting the IRQ; should be unreachable here.
+            TouchScreenState::IDLE => {}
             TouchScreenState::PRESAMPLING => {
                 if !is_low {
                     self.screen_state = TouchScreenState::RELEASED
