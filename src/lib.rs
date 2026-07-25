@@ -29,6 +29,12 @@ use embedded_hal_async::spi::SpiDevice;
 use embedded_hal_async::digital::Wait;
 use embedded_hal::{delay::DelayNs, digital::InputPin};
 
+#[cfg(feature = "calibration")]
+use embedded_graphics_core::pixelcolor::Rgb565;
+#[cfg(feature = "calibration")]
+use embedded_graphics_core::prelude::{DrawTarget, RgbColor};
+#[cfg(feature = "calibration")]
+use crate::calibration::{calculate_calibration, calibration_draw_point};
 
 pub mod calibration;
 pub mod error;
@@ -39,7 +45,7 @@ const CHANNEL_SETTING_Y: u8 = 0b11010000;
 const MAX_SAMPLES: usize = 2; //:D/
 const TX_BUFF_LEN: usize = 5;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct CalibrationData {
     pub alpha_x: f32,
     pub beta_x: f32,
@@ -187,9 +193,10 @@ pub struct Xpt2046<SPI, PinIRQ> {
     ts: TouchSamples,
     calibration_data: CalibrationData,
     operation_mode: TouchScreenOperationMode,
-    // /// Location of the touch points used for
-    // /// performing manual calibration
-    // calibration_point: CalibrationPoint,
+    /// Location of the touch points used for
+    /// performing manual calibration
+    #[cfg(feature = "calibration")]
+    calibration_point: CalibrationPoint,
 }
 
 impl<SPI, PinIRQ> Xpt2046<SPI, PinIRQ>
@@ -207,7 +214,8 @@ where
             ts: TouchSamples::default(),
             calibration_data: orientation.calibration_data(),
             operation_mode: TouchScreenOperationMode::NORMAL,
-            // calibration_point: orientation.calibration_point(),
+            #[cfg(feature = "calibration")]
+            calibration_point: orientation.calibration_point(),
         }
     }
 }
@@ -353,102 +361,104 @@ where
         Ok(())
     }
 
-    // /// Collects the reading for 3 sample points and
-    // /// calculates a set of calibration data. The default calibration data seem
-    // /// to work ok but if for some reason touch screen needs to be recalibrated
-    // /// then look no further.
-    // /// This should be run after init() method.
-    // pub fn calibrate<DT, DELAY>(
-    //     &mut self,
-    //     dt: &mut DT,
-    //     delay: &mut DELAY,
-    // ) -> Result<(), Error<BusError<SPIError, CSError>>>
-    // where
-    //     DT: DrawTarget<Color = Rgb565>,
-    //     DELAY: DelayNs,
-    // {
-    //     let mut calibration_count = 0;
-    //     let mut retry = 3;
-    //     let mut new_a = Point::zero();
-    //     let mut new_b = Point::zero();
-    //     let mut new_c = Point::zero();
-    //     let old_cp = self.calibration_point.clone();
-    //     // Prepare the screen for points
-    //     let _ = dt.clear(Rgb565::BLACK);
+    /// Collects the reading for 3 sample points and
+    /// calculates a set of calibration data. The default calibration data seem
+    /// to work ok but if for some reason touch screen needs to be recalibrated
+    /// then look no further.
+    /// This should be run after init() method.
+    #[cfg(feature = "calibration")]
+    pub async fn calibrate<DT, DELAY>(
+        &mut self,
+        dt: &mut DT,
+        delay: &mut DELAY,
+    ) -> Result<CalibrationData, Error<BusError<SPIError, CSError>>>
+    where
+        DT: DrawTarget<Color = Rgb565>,
+        DELAY: DelayNs,
+    {
+        let mut calibration_count = 0;
+        let mut retry = 3;
+        let mut new_a = Point::zero();
+        let mut new_b = Point::zero();
+        let mut new_c = Point::zero();
+        let old_cp = self.calibration_point.clone();
+        // Prepare the screen for points
+        let _ = dt.clear(Rgb565::BLACK);
 
-    //     // Set correct state to fetch raw data from touch controller
-    //     self.operation_mode = TouchScreenOperationMode::CALIBRATION;
-    //     while calibration_count < 4 {
-    //         // We must run our state machine to capture user input
-    //         self.run()?;
-    //         match calibration_count {
-    //             0 => {
-    //                 calibration_draw_point(dt, &old_cp.a);
-    //                 if self.screen_state == TouchScreenState::TOUCHED {
-    //                     new_a = self.get_touch_point();
-    //                 }
-    //                 if self.screen_state == TouchScreenState::RELEASED {
-    //                     let _ = delay.delay_ms(200);
-    //                     calibration_count += 1;
-    //                 }
-    //             }
+        // Set correct state to fetch raw data from touch controller
+        self.operation_mode = TouchScreenOperationMode::CALIBRATION;
+        while calibration_count < 4 {
+            match calibration_count {
+                0 => {
+                    calibration_draw_point(dt, &old_cp.a);
+                    if self.screen_state == TouchScreenState::TOUCHED {
+                        new_a = self.get_touch_point();
+                    }
+                    if self.screen_state == TouchScreenState::RELEASED {
+                        let _ = delay.delay_ms(200);
+                        calibration_count += 1;
+                    }
+                }
 
-    //             1 => {
-    //                 calibration_draw_point(dt, &old_cp.b);
-    //                 if self.screen_state == TouchScreenState::TOUCHED {
-    //                     new_b = self.get_touch_point();
-    //                 }
-    //                 if self.screen_state == TouchScreenState::RELEASED {
-    //                     let _ = delay.delay_ms(200);
-    //                     calibration_count += 1;
-    //                 }
-    //             }
-    //             2 => {
-    //                 calibration_draw_point(dt, &old_cp.c);
-    //                 if self.screen_state == TouchScreenState::TOUCHED {
-    //                     new_c = self.get_touch_point();
-    //                 }
-    //                 if self.screen_state == TouchScreenState::RELEASED {
-    //                     let _ = delay.delay_ms(200);
-    //                     calibration_count += 1;
-    //                 }
-    //             }
+                1 => {
+                    calibration_draw_point(dt, &old_cp.b);
+                    if self.screen_state == TouchScreenState::TOUCHED {
+                        new_b = self.get_touch_point();
+                    }
+                    if self.screen_state == TouchScreenState::RELEASED {
+                        let _ = delay.delay_ms(200);
+                        calibration_count += 1;
+                    }
+                }
 
-    //             3 => {
-    //                 // Create new calibration point from the captured samples
-    //                 self.calibration_point = CalibrationPoint {
-    //                     a: new_a,
-    //                     b: new_b,
-    //                     c: new_c,
-    //                 };
-    //                 // and then re-caculate calibration
-    //                 match calculate_calibration(&old_cp, &self.calibration_point) {
-    //                     Ok(new_calibration_data) => {
-    //                         self.calibration_data = new_calibration_data;
-    //                         calibration_count += 1;
-    //                     }
-    //                     Err(e) => {
-    //                         // We have problem calculating new values
-    //                         if retry == 0 {
-    //                             return Err(Error::Calibration(e));
-    //                         }
-    //                         /*
-    //                          * If out calculation failed lets retry
-    //                          */
-    //                         retry -= 1;
-    //                         calibration_count = 0;
+                2 => {
+                    calibration_draw_point(dt, &old_cp.c);
+                    if self.screen_state == TouchScreenState::TOUCHED {
+                        new_c = self.get_touch_point();
+                    }
+                    if self.screen_state == TouchScreenState::RELEASED {
+                        let _ = delay.delay_ms(200);
+                        calibration_count += 1;
+                    }
+                }
 
-    //                         let _ = dt.clear(Rgb565::BLACK);
-    //                     }
-    //                 }
-    //             }
-    //             _ => {}
-    //         }
-    //     }
+                3 => {
+                    // Create new calibration point from the captured samples
+                    self.calibration_point = CalibrationPoint {
+                        a: new_a,
+                        b: new_b,
+                        c: new_c,
+                    };
+                    // and then re-calculate calibration
+                    match calculate_calibration(&old_cp, &self.calibration_point) {
+                        Ok(new_calibration_data) => {
+                            self.calibration_data = new_calibration_data;
+                            calibration_count += 1;
+                        }
+                        Err(e) => {
+                            // We have problem calculating new values
+                            if retry == 0 {
+                                return Err(Error::Calibration(e));
+                            }
+                            // If our calculation failed let's retry
+                            retry -= 1;
+                            calibration_count = 0;
 
-    //     let _ = dt.clear(Rgb565::WHITE);
-    //     self.operation_mode = TouchScreenOperationMode::NORMAL;
+                            let _ = dt.clear(Rgb565::BLACK);
+                        }
+                    }
+                }
+                _ => {}
+            }
+            // We must run our state machine to capture user input, but we do it after drawing
+            if calibration_count < 4 {
+                self.run().await?;
+            }
+        }
 
-    //     Ok(())
-    // }
+        let _ = dt.clear(Rgb565::WHITE);
+        self.operation_mode = TouchScreenOperationMode::NORMAL;
+
+        Ok(self.calibration_data)
+    }
 }

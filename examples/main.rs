@@ -26,7 +26,7 @@ use mipidsi::models::ILI9341Rgb565;
 use mipidsi::options::{ColorOrder, Orientation, Rotation};
 use slint::platform::{Platform, PointerEventButton, WindowEvent};
 use slint::platform::software_renderer::{LineBufferProvider, MinimalSoftwareWindow, RepaintBufferType, Rgb565Pixel};
-use xpt2046::{Xpt2046};
+use xpt2046_async::{Xpt2046};
 
 extern crate alloc;
 

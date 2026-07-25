@@ -19,3 +19,7 @@ at your option.
 ### Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
+
+### Calibration
+
+I have restored the calibration code and put it under the `calibration` feature, but it seems to produce a wildly different calibration result than the original calibration data. E.g. the coordinates in the original calibration look 2 times smaller than needed, but for re-calibrated they are instead shifted by a lot.
