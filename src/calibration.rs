@@ -25,6 +25,7 @@ pub struct CalibrationPoint {
 }
 
 impl CalibrationPoint {
+    #[must_use]
     pub fn delta(&self) -> i32 {
         (self.a[0] - self.c[0]) * (self.b[1] - self.c[1])
             - (self.b[0] - self.c[0]) * (self.a[1] - self.c[1])

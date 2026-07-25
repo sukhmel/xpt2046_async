@@ -3,11 +3,11 @@ name = "xpt2046-async"
 version = "0.3.3"
 edition = "2021"
 description = "Embedded-hal based XPT2046 driver for TFT LCD displays"
-authors = ["VersBInarii <versbinarii@gmail.com>"]
-keywords = ["embedded-hal-driver", "xpt2046", "touch", "LCD", "no_std"]
+categories = ["embedded", "hardware-support", "no-std"]
+authors = ["VersBInarii <versbinarii@gmail.com>", "Vladislav Sukhmel <sukhmel.v@gmail.com>"]
+keywords = ["embedded-hal-driver", "xpt2046", "touch", "no_std", "async"]
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/VersBinarii/xpt2046"
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+repository = "https://github.com/sukhmel/xpt2046_async"
 
 [lib]
 name = "xpt2046_async"

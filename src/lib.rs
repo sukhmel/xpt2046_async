@@ -1,5 +1,5 @@
-#![doc(html_root_url = "https://docs.rs/xpt2046")]
-#![doc(issue_tracker_base_url = "https://github.com/VersBinarii/xpt2046/issues/")]
+#![doc(html_root_url = "https://docs.rs/xpt2046-async")]
+#![doc(issue_tracker_base_url = "https://github.com/sukhmel/xpt2046_async/issues/")]
 #![deny(
     missing_debug_implementations,
     trivial_casts,
@@ -13,6 +13,7 @@
     unused_comparisons,
     unused_must_use
 )]
+#![warn(clippy::pedantic, clippy::nursery, clippy::all, clippy::cargo)]
 #![no_std]
 
 //! A platform agnostic Rust driver for XPT2046 touch controller, based on the
@@ -39,8 +40,8 @@ use crate::calibration::{calculate_calibration, calibration_draw_point};
 pub mod calibration;
 pub mod error;
 
-const CHANNEL_SETTING_X: u8 = 0b10010000;
-const CHANNEL_SETTING_Y: u8 = 0b11010000;
+const CHANNEL_SETTING_X: u8 = 0b1001_0000;
+const CHANNEL_SETTING_Y: u8 = 0b1101_0000;
 
 const MAX_SAMPLES: usize = 2; //:D/
 const TX_BUFF_LEN: usize = 5;
@@ -56,7 +57,7 @@ pub struct CalibrationData {
 }
 
 /// Orientation of the touch screen
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Orientation {
     Portrait,
     PortraitFlipped,
@@ -68,14 +69,15 @@ impl Orientation {
     /// Default location for the test touch point
     /// Those depend on whether the touch screen operates in
     /// Portrait or Landscape position
-    pub fn calibration_point(&self) -> CalibrationPoint {
+    #[must_use]
+    pub const fn calibration_point(&self) -> CalibrationPoint {
         match self {
-            Orientation::Portrait | Orientation::PortraitFlipped => CalibrationPoint {
+            Self::Portrait | Self::PortraitFlipped => CalibrationPoint {
                 a: Point::new(10, 10),
                 b: Point::new(80, 210),
                 c: Point::new(200, 170),
             },
-            Orientation::Landscape | Orientation::LandscapeFlipped => CalibrationPoint {
+            Self::Landscape | Self::LandscapeFlipped => CalibrationPoint {
                 a: Point::new(20, 25),
                 b: Point::new(160, 220),
                 c: Point::new(300, 110),
@@ -86,38 +88,39 @@ impl Orientation {
     /// Default calibration values used for calculating the touch points
     /// Those depend on whether the touch screen operates in
     /// Portrait or Landscape position
-    pub fn calibration_data(&self) -> CalibrationData {
+    #[must_use]
+    pub const fn calibration_data(&self) -> CalibrationData {
         match self {
-            Orientation::Portrait => CalibrationData {
-                alpha_x: -0.0009337,
-                beta_x: -0.0636839,
+            Self::Portrait => CalibrationData {
+                alpha_x: -0.000_933_7,
+                beta_x: -0.063_683_9,
                 delta_x: 250.342,
-                alpha_y: -0.0889775,
-                beta_y: -0.00118110,
+                alpha_y: -0.088_977_5,
+                beta_y: -0.001_181_10,
                 delta_y: 356.538,
             },
-            Orientation::PortraitFlipped => CalibrationData {
-                alpha_x: 0.0006100,
-                beta_x: 0.0647828,
+            Self::PortraitFlipped => CalibrationData {
+                alpha_x: 0.000_610_0,
+                beta_x: 0.064_782_8,
                 delta_x: -13.634,
-                alpha_y: 0.0890609,
-                beta_y: 0.0001381,
+                alpha_y: 0.089_060_9,
+                beta_y: 0.000_138_1,
                 delta_y: -35.73,
             },
-            Orientation::Landscape => CalibrationData {
-                alpha_x: -0.0885542,
-                beta_x: 0.0016532,
+            Self::Landscape => CalibrationData {
+                alpha_x: -0.088_554_2,
+                beta_x: 0.001_653_2,
                 delta_x: 349.800,
-                alpha_y: 0.0007309,
-                beta_y: 0.06543699,
+                alpha_y: 0.000_730_9,
+                beta_y: 0.065_436_99,
                 delta_y: -15.290,
             },
-            Orientation::LandscapeFlipped => CalibrationData {
-                alpha_x: 0.0902216,
-                beta_x: 0.0006510,
+            Self::LandscapeFlipped => CalibrationData {
+                alpha_x: 0.090_221_6,
+                beta_x: 0.000_651_0,
                 delta_x: -38.657,
-                alpha_y: -0.0010005,
-                beta_y: -0.0667030,
+                alpha_y: -0.001_000_5,
+                beta_y: -0.066_703_0,
                 delta_y: 258.08,
             },
         }
@@ -125,7 +128,7 @@ impl Orientation {
 }
 
 /// Current state of the driver
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub enum TouchScreenState {
     /// Driver waith for touch
     IDLE,
@@ -137,7 +140,7 @@ pub enum TouchScreenState {
     RELEASED,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum TouchScreenOperationMode {
     /// Normal touch reading
     NORMAL,
@@ -163,6 +166,7 @@ impl Default for TouchSamples {
 }
 
 impl TouchSamples {
+    #[must_use]
     pub fn average(&self) -> Point {
         let mut x = 0;
         let mut y = 0;
@@ -171,15 +175,15 @@ impl TouchSamples {
             x += point.x;
             y += point.y;
         }
-        x /= MAX_SAMPLES as i32;
-        y /= MAX_SAMPLES as i32;
+        x /= i32::try_from(MAX_SAMPLES).unwrap_or(i32::MAX);
+        y /= i32::try_from(MAX_SAMPLES).unwrap_or(i32::MAX);
         Point::new(x, y)
     }
 }
 
 #[derive(Debug)]
 pub struct Xpt2046<SPI, PinIRQ> {
-    /// THe SPI interface
+    /// The SPI interface
     spi: SPI,
     /// Interrupt control pin
     irq: PinIRQ,
@@ -241,8 +245,8 @@ where
     async fn read_xy(&mut self) -> Result<Point, Error<BusError<SPIError, CSError>>> {
         self.spi_read().await?;
 
-        let x = ((self.rx_buff[1] as i32) << 8) | (self.rx_buff[2] as i32);
-        let y = ((self.rx_buff[3] as i32) << 8) | (self.rx_buff[4] as i32);
+        let x = (i32::from(self.rx_buff[1]) << 8) | i32::from(self.rx_buff[2]);
+        let y = (i32::from(self.rx_buff[3]) << 8) | i32::from(self.rx_buff[4]);
         Ok(Point::new(x, y))
     }
 
@@ -252,12 +256,15 @@ where
 
         let (x, y) = match self.operation_mode {
             TouchScreenOperationMode::NORMAL => {
+                #[allow(clippy::cast_precision_loss)]
                 let x = self.calibration_data.alpha_x * raw_point.x as f32
                     + self.calibration_data.beta_x * raw_point.y as f32
                     + self.calibration_data.delta_x;
+                #[allow(clippy::cast_precision_loss)]
                 let y = self.calibration_data.alpha_y * raw_point.x as f32
                     + self.calibration_data.beta_y * raw_point.y as f32
                     + self.calibration_data.delta_y;
+                #[allow(clippy::cast_possible_truncation)]
                 (x as i32, y as i32)
             }
             TouchScreenOperationMode::CALIBRATION => {
@@ -282,11 +289,15 @@ where
     }
 
     /// Sometimes the TOUCHED state needs to be cleared
-    pub fn clear_touch(&mut self) {
+    pub const fn clear_touch(&mut self) {
         self.screen_state = TouchScreenState::PRESAMPLING;
     }
 
     /// Reset the driver and preload tx buffer with register data.
+    ///
+    /// # Errors
+    ///
+    /// If SPI read fails.
     pub async fn init<D: DelayNs>(
         &mut self,
         delay: &mut D,
@@ -314,6 +325,10 @@ where
     /// Continually runs and and collects the touch data from xpt2046.
     /// You should drive this either in some main loop or dedicated timer
     /// interrupt
+    ///
+    /// # Errors
+    ///
+    /// If SPI read fails, IRQ pin read fails, or waiting for IRQ low state returned an error.
     pub async fn run(
         &mut self,
     ) -> Result<(), Error<BusError<SPIError, CSError>>> {
@@ -330,7 +345,7 @@ where
             TouchScreenState::IDLE => {}
             TouchScreenState::PRESAMPLING => {
                 if !is_low {
-                    self.screen_state = TouchScreenState::RELEASED
+                    self.screen_state = TouchScreenState::RELEASED;
                 }
                 let point_sample = point;
                 self.ts.samples[self.ts.counter] = point_sample;
@@ -350,14 +365,14 @@ where
                  */
                 self.ts.counter.rem_assign(MAX_SAMPLES - 1);
                 if !is_low {
-                    self.screen_state = TouchScreenState::RELEASED
+                    self.screen_state = TouchScreenState::RELEASED;
                 }
             }
             TouchScreenState::RELEASED => {
                 self.screen_state = TouchScreenState::IDLE;
                 self.ts.counter = 0;
             }
-        };
+        }
         Ok(())
     }
 
