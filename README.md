@@ -23,3 +23,9 @@ Unless you explicitly state otherwise, any contribution intentionally submitted 
 ### Calibration
 
 I have restored the calibration code and put it under the `calibration` feature, but it seems to produce a wildly different calibration result than the original calibration data. E.g. the coordinates in the original calibration look 2 times smaller than needed, but for re-calibrated they are instead shifted by a lot.
+
+### Picture
+
+![Example](touch_rust_async.png)
+
+I don't know if async makes it behave like that, or maybe the display I have is wonky, but precision is subpar and sometimes the readings wobble around an actual touch point. If someone knows how to improve the driver, I'm all for it.

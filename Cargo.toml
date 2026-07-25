@@ -8,6 +8,7 @@ authors = ["VersBInarii <versbinarii@gmail.com>", "Vladislav Sukhmel <sukhmel.v@
 keywords = ["embedded-hal-driver", "xpt2046", "touch", "no_std", "async"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/sukhmel/xpt2046_async"
+exclude = ["*.png"]
 
 [lib]
 name = "xpt2046_async"
